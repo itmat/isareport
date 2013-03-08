@@ -5,12 +5,12 @@ Let's just go on the record that we feel that ISA-TAB is a terrible "standard" f
 
 ISA-Report is a tool, written in python, to create interactive and useful HTML5 reports from ISA-TAB experimental annotation files.
 
-The report consists of an interactive graph visualization of the Assays, Samples, Protocols, Data Files, etc., described in the ISA-TAB files, along with readable reports of the annotation laid out in a sensible format. Visualization comes courtesy of the excellent [D3.js](http://d3js.org) library. 
+The report consists of an interactive graph visualization of the Assays, Samples, Protocols, Data Files, etc., described in the ISA-TAB files, along with readable reports of the annotation laid out in a sensible format. 
 
 Once released, you should be able to simple do the following to install:
 
 ```python
-pip install isa-graph
+pip install isareport
 ```
 
 Until then, though, you will need to download this repo and install like so:
@@ -24,6 +24,6 @@ python setup.py install
 ## USAGE
 
 ```bash
-cd path/to/directory/containing/isatab/files
-isareport my.awesome.isatab.file.isa
+cd path/to/directory/containing/isatab/annotated/experiment
+isareport -i i_Investigation.txt -o report.html
 ```
