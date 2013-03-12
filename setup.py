@@ -12,10 +12,8 @@ setup(
     description = "Turns ISA-TAB format into a pretty HTML5 report.",
     license = "MIT",
     url = "https://github.com/itmat/isareport",
-    namespace_packages = ["itmat"],
     packages = ['isareport'],
     scripts = ['bin/isareport'],
-    install_requires = ['biopy-isatab','jinja2']
-    # test_suite = 'nose.collector'
+    install_requires = ['biopy-isatab','mako','pyhaml','pygraphviz']
 )
 
