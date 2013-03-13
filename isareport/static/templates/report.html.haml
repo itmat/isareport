@@ -1,0 +1,11 @@
+!!! 5
+%html
+    %head
+    %body
+        #investigation
+            %h2=investigation.metadata['Investigation Identifier']
+            %table
+                %tr
+                    %th Title
+                    %td=investigation.metadata['Investigation Title']
+        #graph= open(svg_file).read()
