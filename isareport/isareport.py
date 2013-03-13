@@ -36,12 +36,12 @@ def get_arguments():
     return args.parse_args()
 
 def setup_logging(args):
-    logging.basicConfig(level=logging.INFO,
+    logging.basicConfig(level=logging.ERROR,
                         format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
-
-
-    if args.debug or args.verbose:
+    if args.verbose:
+        logging.setLevel(logging.INFO)
+    if args.debug:
         logging.setLevel(logging.DEBUG)
 
 def sanitize_name(n):
