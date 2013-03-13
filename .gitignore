@@ -50,3 +50,19 @@ nosetests.xml
 #********** project ********** 
 tmp/*
 log/*
+
+#********** emacs template********** 
+
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+.elc
+auto-save-list
+tramp
+.\#*
+
+# Org-mode
+.org-id-locations
+*_archive
+ 

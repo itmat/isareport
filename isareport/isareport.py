@@ -8,7 +8,7 @@ import logging
 import tempfile
 from bcbio import isatab
 import yaml
-import slug 
+from slug import slug
 
 def get_arguments():
     args = argparse.ArgumentParser()
@@ -24,10 +24,6 @@ def get_arguments():
         help="The path to the output HTML report file."
     )
     args.add_argument(
-        '--log',
-        default="isareport.log",
-        help="Location of log file")
-    args.add_argument(
         '--verbose', '-v',
         action='store_true',
         help="Be verbose"
@@ -40,24 +36,16 @@ def get_arguments():
     return args.parse_args()
 
 def setup_logging(args):
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S',
-                        filename=args.log,
-                        filemode='w')
+                        datefmt='%Y-%m-%d %H:%M:%S')
 
-    console = logging.StreamHandler()
-    formatter = logging.Formatter('%(levelname)-8s %(message)s')
-    console.setFormatter(formatter)
 
     if args.debug or args.verbose:
-        console.setLevel(logging.DEBUG)
-    else:
-        console.setLevel(logging.INFO)
-    logging.getLogger('').addHandler(console)
+        logging.setLevel(logging.DEBUG)
 
 def sanitize_name(n):
-    return str(slug.slug(unicode(n)))
+    return slug(unicode(n))
 
 def generate_study_graph(study):
     g = pygraphviz.AGraph(directed=True,rankdir='LR')
