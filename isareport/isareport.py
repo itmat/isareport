@@ -29,7 +29,7 @@ def get_arguments():
         help="Be verbose"
     )
     args.add_argument(
-        '--debug', '-d', 
+        '--debug', '-d',
         action='store_true',
         help="Print debugging information"
     )
@@ -47,8 +47,7 @@ def setup_logging(args):
 def sanitize_name(n):
     return slug(unicode(n))
 
-def generate_study_graph(study):
-    g = pygraphviz.AGraph(directed=True,rankdir='LR')
+def generate_study_graph(study,g):
     # generate_investigation(g,investigation)
     sid = sanitize_name(study.metadata['Study Identifier'])
     for k in study.nodes.keys():
@@ -60,16 +59,21 @@ def generate_study_graph(study):
             g.add_node(srcid,label=src,URL="#g-" + srcid)
             g.add_edge(srcid,nid)
     return g
+def generate_assay_graph(assay,g):
+    aid = sanitize_name(assay.metadata)
+
+    return g
+
 
 def run_report(args):
     # parse the ISA-TAB file
     if not os.path.exists(args.isatab_metadata_directory):
-        logging.error("ISA-TAB metadata directory does not exists: " + 
+        logging.error("ISA-TAB metadata directory does not exists: " +
             args.isatab_metadata_directory)
         raise BaseException("Directory does not exists" + args.isatab_metadata_directory)
         exit()
     if not os.path.isdir(args.isatab_metadata_directory):
-        logging.error("ISA-TAB metadata directory does not exists: " + 
+        logging.error("ISA-TAB metadata directory does not exists: " +
             args.isatab_metadata_directory)
         raise BaseException("Not a directory" + args.isatab_metadata_directory)
         exit()
@@ -82,17 +86,22 @@ def run_report(args):
     )
 
     # get the graph structure of the Investigation
-    inv_graph = generate_study_graph(investigation.studies[0])
-    # write out the SVG
-    svg = tempfile.NamedTemporaryFile()
-    inv_graph.draw(svg.name,format='svg',prog='dot')
+    for study in investigation.studies:
+        g = pygraphviz.AGraph(directed=True,rankdir='LR',name=sanitize_name(study.metadata['Study Identifier']))
+        g = generate_study_graph(investigation.studies[0],g)
+        # add assays
+        for assay in study.assays:
+            g = generate_assay_graph(assay,g)
+        # write out the SVG
+        svg = tempfile.NamedTemporaryFile()
+        inv_graph.draw(svg.name,format='svg',prog='dot')
     context = {"svg_file": svg.name,"investigation": investigation}
 
     args.output.write(template.render(**context))
     svg.close()
 
 
-def main(): 
+def main():
     '''Run ISA-Report'''
     args = get_arguments()
     setup_logging(args)

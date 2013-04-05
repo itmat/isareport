@@ -14,6 +14,6 @@ setup(
     url = "https://github.com/itmat/isareport",
     packages = ['isareport'],
     scripts = ['bin/isareport'],
-    install_requires = ['biopy-isatab','mako','pyhaml','pygraphviz']
+    install_requires = ['mako','pyhaml','pygraphviz','slug','oset']
 )
 
