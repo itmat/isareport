@@ -2,13 +2,21 @@
 import argparse
 import haml
 import mako.template
-import pygraphviz
+import pygraphviz as gv
 import os
+import re
 import logging
 import tempfile
-from bcbio import isatab
+import parser
 import yaml
-from slug import slug
+
+GVSHAPES = {
+    'file': "rect", 
+    'entity': 'ellipse',
+    'reference': 'diamond'
+}
+def slug(name):
+    return re.sub(r'[^0-9a-z.-_]','-',name.lower())
 
 def get_arguments():
     args = argparse.ArgumentParser()
@@ -40,30 +48,21 @@ def setup_logging(args):
                         format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
     if args.verbose:
-        logging.setLevel(logging.INFO)
+        logging.getLogger().setLevel(logging.INFO)
     if args.debug:
-        logging.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
 
-def sanitize_name(n):
-    return slug(unicode(n))
-
-def generate_study_graph(study,g):
-    # generate_investigation(g,investigation)
-    sid = sanitize_name(study.metadata['Study Identifier'])
-    for k in study.nodes.keys():
-        n = study.nodes[k]
-        nid = sanitize_name(sid + " - " + k)
-        g.add_node(nid,label=k,URL="#g-" + nid)
-        for src in n.metadata['Source Name']:
-            srcid = sanitize_name(sid + " - " + src)
-            g.add_node(srcid,label=src,URL="#g-" + srcid)
-            g.add_edge(srcid,nid)
-    return g
-def generate_assay_graph(assay,g):
-    aid = sanitize_name(assay.metadata)
-
-    return g
-
+def generate_subgraph(name,nodes,g):
+    gg = g.subgraph(name="cluster-" + slug(name))
+    for node in nodes:
+        shape = GVSHAPES[node.ntype]
+        # check to see of a REF
+        gg.add_node(node.nid,label=node.label,URL="#g-" + node.nid, shape=shape)
+    # add in the edges
+    for node in nodes:
+        for c in node.children:
+            gg.add_edge(node.nid, c)
+    return gg
 
 def run_report(args):
     # parse the ISA-TAB file
@@ -77,7 +76,7 @@ def run_report(args):
             args.isatab_metadata_directory)
         raise BaseException("Not a directory" + args.isatab_metadata_directory)
         exit()
-    investigation = isatab.parse(args.isatab_metadata_directory)
+    investigation = parser.parse(args.isatab_metadata_directory)
 
     # setup the report templates and output
     template = mako.template.Template(
@@ -86,20 +85,27 @@ def run_report(args):
     )
 
     # get the graph structure of the Investigation
+    study_graphs = {}
+    ### TO-DO: Clean up the mess below. Need to figure out a good way for multiple SVG files.
     for study in investigation.studies:
-        g = pygraphviz.AGraph(directed=True,rankdir='LR',name=sanitize_name(study.metadata['Study Identifier']))
-        g = generate_study_graph(investigation.studies[0],g)
-        # add assays
-        for assay in study.assays:
-            g = generate_assay_graph(assay,g)
-        # write out the SVG
-        svg = tempfile.NamedTemporaryFile()
-        inv_graph.draw(svg.name,format='svg',prog='dot')
-    context = {"svg_file": svg.name,"investigation": investigation}
-
+        g = gv.AGraph(directed=True,rankdir='LR',name=slug(investigation.metadata['Investigation Identifier']))
+        for study in investigation.studies:
+            generate_subgraph(study.metadata['Study Identifier'],study.nodes.values(),g)
+            # add assays
+            for assay in study.assays:
+                aname = assay.metadata['Study Assay File Name']
+                generate_subgraph(aname,assay.nodes.values(),g)
+            # write out the SVG
+        sfbasename  = slug(study.metadata['Study Identifier']) 
+        svg = os.path.join(tempfile.gettempdir(), sfbasename + '.svg')
+        g.draw(svg,format='svg',prog='dot')
+        study_graphs[study.metadata['Study Identifier']] = {'f': svg, "g": g} 
+        if args.debug:
+            tmpf  = open(sfbasename + '.dot' ,'w')
+            tmpf.write(g.to_string())
+            tmpf.close()
+    context = {"svg_file": [study_graphs[x]['f'] for x in study_graphs.keys()] ,"investigation": investigation}
     args.output.write(template.render(**context))
-    svg.close()
-
 
 def main():
     '''Run ISA-Report'''

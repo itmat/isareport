@@ -35,7 +35,6 @@ import re
 import csv
 import glob
 import collections
-import slug
 from oset import oset as OrderedSet
 
 
@@ -169,14 +168,12 @@ class StudyAssayParser:
         """Retrieve row data from files associated with the ISATabRecord.
         """
         final_studies = []
-        for study, study_index in enumerate(rec.studies):
-            sid = 's%i' % study_index
+        for study_index, study in enumerate(rec.studies):
             source_data = self._parse_nodes(study.metadata["Study File Name"])
             if source_data:
                 study.nodes = source_data
                 final_assays = []
-                for assay,assay_index in enumerate(study.assays):
-                    aid = '%s-a%i' % (sid, assay_index)
+                for assay_index, assay in enumerate(study.assays):
                     cur_assay = Assay(assay)
                     assay_data = self._parse_nodes(assay["Study Assay File Name"])
                     cur_assay.nodes = assay_data
@@ -187,44 +184,59 @@ class StudyAssayParser:
         return rec
 
     def _slug(self,name):
-        return slug.slug(unicode(name))
+        return re.sub(r'[^0-9a-z.-_]','-',name.lower())
 
     def _collapse_rows(self,headers,reader):
-        last_attr = None
-        last_node = None
         nodes = collections.OrderedDict()
         for row in reader:
+            last_attr = None
+            last_node = None
             for i in range(0,len(headers)):
-                if m = self._RE_ATTR_QUALS.match(headers[i]):
+                m = self._RE_ATTR_QUALS.match(headers[i])
+                if m:
+                    if len(row[i]) == 0: 
+                        continue
                     # this is a qualifier for an attribute
                     # add it to the last attribute
                     last_node.metadata[last_attr][headers[i]] = row[i]
-                elif m = self._RE_NODES.match(header[i]):
-                    # This is a node. Process it
-                    nid = self._slug(row[i])
-                    # check if this node exists
-                    if not nodes.has_key(nid):
-                        # this is a new node
-                        nsubtype = self._slug(m.group(1))
-                        ntype = self._slug(m.group(2))
-                        label = row[i]
-                        node = IsaNode(nid,ntype,nsubtype,label)
-                        nodes[nid] = node
-                    if last_node and last_node != nid:
-                        nodes[last_node].children.add(nid)
-                        nodes[nid].parents.add(nodes[last_node].nid)
-                    last_node = nid
                 else:
-                    # this is an attribute. Add it to the last node
-                    m = self._RE_ATTRS.match(header[i])
-                    last_attr = attr_class = m.group(1)
-                    if m.group(2) == '':
-                        nodes[last_node].metadata[attr_class] = row[i]
+                    # not an attr qualifier
+                    # test to see if a node
+                    m = self._RE_NODES.match(headers[i])
+                    if m:
+                        # This is a node. Process it.
+                        nid = self._slug(row[i])
+                        # check to see if this is a REF
+                        if m.group(2) == 'REF':
+                            # it is. Force a new nid based on the parent
+                            nid = last_node.nid + "-ref-" + nid
+                        # check if this node exists
+                        node = None
+                        if not nodes.has_key(nid):
+                            # this is a new node
+                            nsubtype = self._slug(m.group(1))
+                            ntype = self._slug(m.group(2))
+                            label = row[i]
+                            node = IsaNode(nid,ntype,nsubtype,label)
+                            nodes[nid] = node
+                        else: 
+                            node = nodes[nid]
+                        if last_node and last_node.nid != nid:
+                            # print(last_node.nid, nid)
+                            last_node.children.add(nid)
+                            node.parents.add(last_node.nid)
+                        last_node = node
                     else:
-                        if nodes[last_node].metadata.has_key(attr_class):
-                            nodes[last_node].metadata[attr_class][m.group(2)] = row[i]
+                        # This is an attribute. Add it to the last node.
+                        m = self._RE_ATTRS.match(headers[i])
+                        last_attr = attr_class = m.group(1)
+                        if m.group(2) == '':
+                            last_node.metadata[attr_class] = {'value': row[i]}
                         else:
-                            nodes[last_node].metadata[attr_class] = {m.group(2) : row[i]}
+                            if last_node.metadata.has_key(attr_class):
+                                last_node.metadata[attr_class][m.group(2)] = row[i]
+                            else:
+                                last_node.metadata[attr_class] = {m.group(2) : row[i]}
         return nodes
     def _parse_nodes(self, fname):
         """Parse ISATab study or assay tab delimited files.
@@ -283,14 +295,21 @@ class Assay:
 class IsaNode:
     """Represents a Node record (either from a ISATAB Study or Assay file).
     """
+    types = {
+        'name': 'entity',
+        'file': 'file',
+        'ref' : 'reference',
+    }
+
     def __init__(self,nid,ntype,nsubtype,label):
         self.nid = nid
-        self.ntype = ntype
+        self.ntype = self.types[ntype.lower()]
         self.nsubtype = nsubtype
-        self.label= label
+        self.label = label
         self.parents = OrderedSet()
         self.children = OrderedSet()
         self.metadata = collections.defaultdict(collections.defaultdict)
+
     def __str__(self):
-        return "Node: type={type}, nid={nid}, label={label}".format(self.ntype,
-            self.nid, self.label)
+        return "Node: type=%s %s, nid='%s', label='%s'" % \
+        (self.nsubtype, self.ntype, self.nid, self.label)
